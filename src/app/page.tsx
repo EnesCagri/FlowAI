@@ -44,6 +44,13 @@ const mathOperations = [
   "mod",
   "faktöriyel",
   "yazdır",
+  "dosyaoku",
+  "resimoku",
+  "gri",
+  "parlaklik",
+  "kontrast",
+  "bulanik",
+  "değişken",
 ] as const;
 
 export default function FlowEditor() {
@@ -126,6 +133,9 @@ export default function FlowEditor() {
         type: "block",
         position,
         data: {
+          id: `${data.type}-${Date.now()}`,
+          position,
+          data: {},
           label: data.label,
           type: data.type,
         },
@@ -142,7 +152,7 @@ export default function FlowEditor() {
       if (!node) return undefined;
 
       if (node.data.type === "değişken") {
-        return parseFloat(node.data.value || "0");
+        return parseFloat(String(node.data.value || "0"));
       }
 
       if (mathOperations.includes(node.data.type as MathOperation)) {

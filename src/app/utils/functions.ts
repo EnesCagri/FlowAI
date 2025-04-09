@@ -163,7 +163,7 @@ export const processNode = (
           }
 
           const processedImage = processImage(
-            pixelData,
+            Array.from(pixelData),
             width,
             height,
             node.data.type,
@@ -193,7 +193,7 @@ export const processNode = (
           "üs",
           "mod",
           "faktöriyel",
-        ].includes(node.data.type)
+        ].includes(node.data.type || "")
       ) {
         result = calculateMathOperation(node, nodes, edges);
         if (result !== null) {
@@ -206,7 +206,9 @@ export const processNode = (
   // Mark the node as processed and store the result
   node.data.processed = true;
   if (result !== null) {
-    if (["gri", "parlaklik", "kontrast", "bulanik"].includes(node.data.type)) {
+    if (
+      ["gri", "parlaklik", "kontrast", "bulanik"].includes(node.data.type || "")
+    ) {
       node.data.imageData = result;
       node.data.result = undefined; // Clear any previous numeric result
     } else {

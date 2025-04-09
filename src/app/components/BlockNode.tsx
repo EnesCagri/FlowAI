@@ -1,10 +1,11 @@
 import { memo, useState, useEffect, useRef } from "react";
-import { Handle, Position, NodeProps } from "@xyflow/react";
+import { Handle, Position, NodeProps, useNodes, useEdges } from "@xyflow/react";
 import { useStore } from "../store/useFlowStore";
 import { motion } from "framer-motion";
-import { X, FileText, Upload, Image as ImageIcon } from "lucide-react";
-import { NodeData, MathOperation, mathOperations } from "../types";
+import { X, Upload, Image as ImageIcon } from "lucide-react";
+import { NodeData, MathOperation, mathOperations, EdgeData } from "../types";
 import { processImage } from "../utils/imageProcessing";
+import Image from "next/image";
 
 const getNodeColor = (type: string) => {
   switch (type) {
@@ -46,29 +47,32 @@ const getNodeColor = (type: string) => {
 };
 
 export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
+  const typedData = data as NodeData;
   const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(data.value || "");
+  const [value, setValue] = useState(typedData.value || "");
   const [isHovered, setIsHovered] = useState(false);
   const [inputValue, setInputValue] = useState<string | undefined>(undefined);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { updateNode, removeNode } = useStore();
-  const nodes = useStore((state) => state.nodes);
-  const edges = useStore((state) => state.edges);
+  const nodes = useNodes<NodeData>();
+  const edges = useEdges<EdgeData>();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (data.type === "yazdır") {
+    if (typedData.type === "yazdır") {
       const inputEdge = edges.find((edge) => edge.target === id);
       if (inputEdge) {
         const inputNode = nodes.find((n) => n.id === inputEdge.source);
         if (inputNode) {
           let newValue: string | undefined;
-          if (inputNode.data.type === "dosyaoku") {
-            newValue = inputNode.data.fileContent || "";
+          const inputNodeData = inputNode.data as NodeData;
+          if (inputNodeData.type === "dosyaoku") {
+            newValue = inputNodeData.fileContent || "";
           } else {
             newValue =
-              inputNode.data.value || inputNode.data.result?.toString();
+              inputNodeData.value?.toString() ||
+              inputNodeData.result?.toString();
           }
 
           if (newValue !== inputValue) {
@@ -82,44 +86,41 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
         setInputValue(undefined);
       }
     }
-  }, [data.type, edges, id, nodes, inputValue]);
+  }, [typedData.type, edges, id, nodes, inputValue]);
 
   const processImageEffect = () => {
-    if (["gri", "parlaklik", "kontrast", "bulanik"].includes(data.type)) {
-      const inputEdge = edges.find((edge) => edge.target === id);
-      if (inputEdge) {
-        const inputNode = nodes.find((n) => n.id === inputEdge.source);
-        if (inputNode?.data.imageData) {
-          const { width, height, data: pixelData } = inputNode.data.imageData;
+    if (!typedData.type) return;
 
-          let intensity: number | undefined;
-          if (["parlaklik", "kontrast", "bulanik"].includes(data.type)) {
-            const intensityEdge = edges.find(
-              (edge) => edge.target === id && edge.targetHandle === "intensity"
-            );
-            if (intensityEdge) {
-              const intensityNode = nodes.find(
-                (n) => n.id === intensityEdge.source
-              );
-              intensity = Number(
-                intensityNode?.data.value || intensityNode?.data.result || 0
-              );
-            }
-          }
+    const inputEdges = edges.filter((edge) => edge.target === id);
+    if (inputEdges.length === 0) return;
 
-          const result = processImage(
-            pixelData,
-            width,
-            height,
-            data.type,
-            intensity
-          );
-          if (result) {
-            updateNode(id, { imageData: result });
-            setImagePreview(result.originalImage);
-          }
-        }
-      }
+    const inputNode = nodes.find((node) => node.id === inputEdges[0].source);
+    if (!inputNode?.data) return;
+    const inputNodeData = inputNode.data as NodeData;
+    if (!inputNodeData.imageData) return;
+
+    const inputData = inputNodeData.imageData;
+    const intensity = typedData.value || 0;
+
+    const processed = processImage(
+      Array.from(inputData.data),
+      inputData.width,
+      inputData.height,
+      typedData.type,
+      intensity
+    );
+
+    if (processed) {
+      updateNode(id, {
+        ...typedData,
+        imageData: {
+          width: processed.width,
+          height: processed.height,
+          data: processed.data,
+        },
+        originalImage: processed.originalImage,
+        processed: true,
+      });
     }
   };
 
@@ -202,7 +203,9 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
     reader.readAsDataURL(file);
   };
 
-  const isMathOperation = mathOperations.includes(data.type as MathOperation);
+  const isMathOperation = mathOperations.includes(
+    typedData.type as MathOperation
+  );
   const isSingleInputOperation = [
     "kare",
     "karekök",
@@ -211,8 +214,8 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
     "yazdır",
     "dosyaoku",
     "gri",
-  ].includes(data.type as MathOperation);
-  const nodeColorClass = getNodeColor(data.type);
+  ].includes(typedData.type as MathOperation);
+  const nodeColorClass = getNodeColor(typedData.type || "");
 
   return (
     <motion.div
@@ -234,9 +237,9 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
       )}
 
       <div className="flex flex-col">
-        <div className="text-lg font-bold text-gray-800">{data.label}</div>
-        <div className="text-gray-500 text-sm">{data.type}</div>
-        {data.type === "değişken" && (
+        <div className="text-lg font-bold text-gray-800">{typedData.label}</div>
+        <div className="text-gray-500 text-sm">{typedData.type}</div>
+        {typedData.type === "değişken" && (
           <div className="mt-2">
             {isEditing ? (
               <motion.div
@@ -264,12 +267,12 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
                 onClick={() => setIsEditing(true)}
               >
                 <span className="font-semibold">Değer:</span>{" "}
-                {data.value || "Düzenlemek için tıklayın"}
+                {typedData.value || "Düzenlemek için tıklayın"}
               </div>
             )}
           </div>
         )}
-        {data.type === "dosyaoku" && (
+        {typedData.type === "dosyaoku" && (
           <div
             className={`mt-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
               isDragging ? "border-rose-400 bg-rose-50" : "border-gray-300"
@@ -295,20 +298,20 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
                 Dosyayı sürükleyin veya tıklayarak seçin
               </p>
             </div>
-            {data.fileContent && (
+            {typedData.fileContent && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="mt-2 text-sm bg-white/80 p-2 rounded-md backdrop-blur-sm"
               >
                 <span className="font-semibold">İçerik:</span>{" "}
-                {data.fileContent.substring(0, 50)}
-                {data.fileContent.length > 50 && "..."}
+                {typedData.fileContent.substring(0, 50)}
+                {typedData.fileContent.length > 50 && "..."}
               </motion.div>
             )}
           </div>
         )}
-        {data.type === "yazdır" && inputValue !== undefined && (
+        {typedData.type === "yazdır" && inputValue !== undefined && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -317,7 +320,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             <span className="font-semibold">Giriş:</span> {inputValue}
           </motion.div>
         )}
-        {data.type === "resimoku" && (
+        {typedData.type === "resimoku" && (
           <div
             className={`mt-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
               isDragging ? "border-purple-400 bg-purple-50" : "border-gray-300"
@@ -349,9 +352,11 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
                 animate={{ opacity: 1 }}
                 className="mt-2"
               >
-                <img
+                <Image
                   src={imagePreview}
                   alt="Preview"
+                  width={200}
+                  height={200}
                   className="max-w-full h-auto rounded-md"
                   style={{ maxHeight: "200px" }}
                 />
@@ -359,16 +364,20 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             )}
           </div>
         )}
-        {["gri", "parlaklik", "kontrast", "bulanik"].includes(data.type) &&
+        {["gri", "parlaklik", "kontrast", "bulanik"].includes(
+          typedData.type || ""
+        ) &&
           imagePreview && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="mt-2"
             >
-              <img
+              <Image
                 src={imagePreview}
                 alt="Processed Preview"
+                width={200}
+                height={200}
                 className="max-w-full h-auto rounded-md"
                 style={{ maxHeight: "200px" }}
               />
@@ -376,13 +385,15 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
           )}
       </div>
 
-      {data.type === "dosyaoku" || data.type === "resimoku" ? (
+      {typedData.type === "dosyaoku" || typedData.type === "resimoku" ? (
         <Handle
           type="source"
           position={Position.Bottom}
           className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
         />
-      ) : ["parlaklik", "kontrast", "bulanik"].includes(data.type) ? (
+      ) : ["parlaklik", "kontrast", "bulanik"].includes(
+          typedData.type || ""
+        ) ? (
         <>
           <Handle
             type="target"
@@ -404,7 +415,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
           />
         </>
-      ) : data.type === "gri" ? (
+      ) : typedData.type === "gri" ? (
         <>
           <Handle
             type="target"

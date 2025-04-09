@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
-import { mathOperations } from "../types";
+import { DragData } from "../types";
 
 const nodeTypes = [
   { type: "değişken", label: "Değişken" },
@@ -77,10 +77,8 @@ const Sidebar = memo(() => {
         >
           <div className="p-4 space-y-2">
             {filteredNodes.map((node) => (
-              <motion.div
+              <div
                 key={node.type}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 className={`h-12 p-3 rounded-lg cursor-move shadow-lg flex flex-col justify-center ${
                   node.type === "değişken"
                     ? "bg-violet-900/50 border border-violet-800 hover:border-violet-700"
@@ -103,7 +101,7 @@ const Sidebar = memo(() => {
                 <div className="text-gray-400 text-xs leading-tight">
                   {node.type}
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

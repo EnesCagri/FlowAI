@@ -61,6 +61,9 @@ export default function Console({
           ))
         )}
       </div>
+      <div className="text-sm text-gray-500">
+        Çıktılar burada görüntülenecek
+      </div>
     </div>
   );
 }

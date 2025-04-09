@@ -1,4 +1,65 @@
-import { Node } from "@xyflow/react";
+import { Node, Edge, Position } from "@xyflow/react";
+
+export type MathOperation =
+  | "topla"
+  | "çıkar"
+  | "çarp"
+  | "böl"
+  | "kare"
+  | "karekök"
+  | "mutlak"
+  | "üs"
+  | "mod"
+  | "faktöriyel"
+  | "yazdır"
+  | "dosyaoku"
+  | "resimoku"
+  | "gri"
+  | "parlaklik"
+  | "kontrast"
+  | "bulanik"
+  | "değişken";
+
+export interface ImageData {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+
+export interface NodeData {
+  [key: string]: unknown;
+  type?: MathOperation;
+  value?: number;
+  imageData?: ImageData;
+  originalImage?: string;
+  processed?: boolean;
+  id: string;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+  fileContent?: string;
+  label?: string;
+  output?: string;
+  result?: number;
+  width?: number;
+  height?: number;
+  sourcePosition?: Position;
+  targetPosition?: Position;
+  dragHandle?: string;
+  parentId?: string;
+}
+
+export interface EdgeData {
+  [key: string]: unknown;
+  type?: string;
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+}
+
+export type CustomNode = Node<NodeData>;
+export type CustomEdge = Edge<EdgeData>;
 
 export const mathOperations = [
   "topla",
@@ -18,43 +79,12 @@ export const mathOperations = [
   "parlaklik",
   "kontrast",
   "bulanik",
+  "değişken",
 ] as const;
 
-export type MathOperation = (typeof mathOperations)[number];
-
-export interface NodeData {
-  label: string;
-  type:
-    | MathOperation
-    | "değişken"
-    | "yazdır"
-    | "dosyaoku"
-    | "resimoku"
-    | "gri"
-    | "parlaklik"
-    | "kontrast"
-    | "bulanik";
-  value?: string | number;
-  result?: number;
-  fileContent?: string;
-  imageData?: {
-    width: number;
-    height: number;
-    data: number[];
-    originalImage?: string;
-  };
-  intensity?: number;
-  processed?: boolean;
-  output?: string;
-}
-
-export interface CustomNodeData extends Node<NodeData> {
-  type: "block";
-}
-
-export type CustomNode = Node<NodeData>;
+export type CustomNodeData = NodeData;
 
 export interface DragData {
-  type: "değişken" | MathOperation;
+  type: MathOperation;
   label: string;
 }
