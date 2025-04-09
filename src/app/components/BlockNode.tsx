@@ -206,7 +206,8 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
     updateNode(id, { value: e.target.value });
-  };
+  }; 
+  
 
   const handleValueSubmit = () => {
     updateNode(id, { value });
