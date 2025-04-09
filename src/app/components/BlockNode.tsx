@@ -88,6 +88,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
     }
   }, [typedData.type, edges, id, nodes, inputValue]);
 
+  /*
   const processImageEffect = () => {
     if (!typedData.type) return;
 
@@ -123,6 +124,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
       });
     }
   };
+  */
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
