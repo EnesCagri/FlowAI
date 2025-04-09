@@ -3,31 +3,57 @@ import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { DragData } from "../types";
 
-const nodeTypes = [
-  { type: "değişken", label: "Değişken" },
-  { type: "topla", label: "Toplama" },
-  { type: "çıkar", label: "Çıkarma" },
-  { type: "çarp", label: "Çarpma" },
-  { type: "böl", label: "Bölme" },
+const blocks = [
+  // Math Operations
+  { type: "topla", label: "Topla" },
+  { type: "çıkar", label: "Çıkar" },
+  { type: "çarp", label: "Çarp" },
+  { type: "böl", label: "Böl" },
   { type: "kare", label: "Kare" },
   { type: "karekök", label: "Karekök" },
-  { type: "mutlak", label: "Mutlak Değer" },
-  { type: "üs", label: "Üs Alma" },
-  { type: "mod", label: "Mod Alma" },
+  { type: "mutlak", label: "Mutlak" },
+  { type: "üs", label: "Üs" },
+  { type: "mod", label: "Mod" },
   { type: "faktöriyel", label: "Faktöriyel" },
+  // Control Flow
+  { type: "if", label: "If (Eğer)" },
+  // Variables and I/O
+  { type: "değişken", label: "Değişken" },
   { type: "yazdır", label: "Yazdır" },
   { type: "dosyaoku", label: "Dosya Oku" },
+  // Image Operations
   { type: "resimoku", label: "Resim Oku" },
   { type: "gri", label: "Gri Tonlama" },
   { type: "parlaklik", label: "Parlaklık" },
   { type: "kontrast", label: "Kontrast" },
   { type: "bulanik", label: "Bulanıklaştır" },
+  { type: "kenar", label: "Kenar Tespiti" },
 ];
+
+const getBlockColor = (type: string) => {
+  switch (type) {
+    case "değişken":
+      return "bg-violet-900/50 border border-violet-800 hover:border-violet-700";
+    case "yazdır":
+      return "bg-emerald-900/50 border border-emerald-800 hover:border-emerald-700";
+    case "resimoku":
+    case "gri":
+    case "parlaklik":
+    case "kontrast":
+    case "bulanik":
+    case "kenar":
+      return "bg-purple-900/50 border border-purple-800 hover:border-purple-700";
+    case "if":
+      return "bg-yellow-100 border-yellow-300 hover:bg-yellow-200";
+    default:
+      return "bg-blue-900/50 border border-blue-800 hover:border-blue-700";
+  }
+};
 
 const Sidebar = memo(() => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredNodes = nodeTypes.filter(
+  const filteredNodes = blocks.filter(
     (node) =>
       node.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
       node.type.toLowerCase().includes(searchTerm.toLowerCase())
@@ -79,19 +105,9 @@ const Sidebar = memo(() => {
             {filteredNodes.map((node) => (
               <div
                 key={node.type}
-                className={`h-12 p-3 rounded-lg cursor-move shadow-lg flex flex-col justify-center ${
-                  node.type === "değişken"
-                    ? "bg-violet-900/50 border border-violet-800 hover:border-violet-700"
-                    : node.type === "yazdır"
-                    ? "bg-emerald-900/50 border border-emerald-800 hover:border-emerald-700"
-                    : node.type === "resimoku" ||
-                      node.type === "gri" ||
-                      node.type === "parlaklik" ||
-                      node.type === "kontrast" ||
-                      node.type === "bulanik"
-                    ? "bg-purple-900/50 border border-purple-800 hover:border-purple-700"
-                    : "bg-blue-900/50 border border-blue-800 hover:border-blue-700"
-                }`}
+                className={`h-12 p-3 rounded-lg cursor-move shadow-lg flex flex-col justify-center ${getBlockColor(
+                  node.type
+                )}`}
                 draggable
                 onDragStart={(e) => onDragStart(e, node.type, node.label)}
               >

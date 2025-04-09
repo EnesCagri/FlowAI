@@ -1,4 +1,7 @@
-import { Node, Edge, Position } from "@xyflow/react";
+import { Node, Edge } from "@xyflow/react";
+
+export type ComparisonOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
+export type LogicalOperator = "AND" | "OR";
 
 export type MathOperation =
   | "topla"
@@ -18,71 +21,56 @@ export type MathOperation =
   | "parlaklik"
   | "kontrast"
   | "bulanik"
-  | "değişken";
+  | "kenar"
+  | "değişken"
+  | "if";
+
+export type EdgeDetectionAlgorithm = "sobel" | "prewitt" | "roberts";
 
 export interface ImageData {
+  data: Uint8ClampedArray;
   width: number;
   height: number;
-  data: Uint8ClampedArray;
+  originalImage?: string;
+}
+
+export interface Condition {
+  id: string;
+  operator: ComparisonOperator;
+  leftNodeId?: string;
+  rightNodeId?: string;
+}
+
+export interface ConditionGroup {
+  conditions: Condition[];
+  operators: LogicalOperator[];
 }
 
 export interface NodeData {
-  [key: string]: unknown;
   type?: MathOperation;
-  value?: number;
+  value?: string;
+  result?: number;
+  fileContent?: string;
   imageData?: ImageData;
   originalImage?: string;
+  algorithm?: EdgeDetectionAlgorithm;
+  conditionGroup?: ConditionGroup;
   processed?: boolean;
-  id: string;
-  position: { x: number; y: number };
-  data: Record<string, unknown>;
-  fileContent?: string;
-  label?: string;
-  output?: string;
-  result?: number;
-  width?: number;
-  height?: number;
-  sourcePosition?: Position;
-  targetPosition?: Position;
-  dragHandle?: string;
-  parentId?: string;
+  [key: string]: unknown;
 }
 
-export interface EdgeData {
-  [key: string]: unknown;
+export interface EdgeData extends Record<string, unknown> {
   type?: string;
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string;
-  targetHandle?: string;
 }
 
 export type CustomNode = Node<NodeData>;
 export type CustomEdge = Edge<EdgeData>;
 
-export const mathOperations = [
-  "topla",
-  "çıkar",
-  "çarp",
-  "böl",
-  "kare",
-  "karekök",
-  "mutlak",
-  "üs",
-  "mod",
-  "faktöriyel",
-  "yazdır",
-  "dosyaoku",
-  "resimoku",
-  "gri",
-  "parlaklik",
-  "kontrast",
-  "bulanik",
-  "değişken",
-] as const;
-
-export type CustomNodeData = NodeData;
+export interface CustomNodeData {
+  id: string;
+  position: { x: number; y: number };
+  data: NodeData;
+}
 
 export interface DragData {
   type: MathOperation;

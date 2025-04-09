@@ -23,13 +23,20 @@ import { BlockNode } from "./components/BlockNode";
 import Console from "./components/Console";
 import { useStore } from "./store/useFlowStore";
 import type { FlowState } from "./store/useFlowStore";
-import { CustomNode, MathOperation, DragData } from "./types";
+import {
+  CustomNode,
+  MathOperation,
+  DragData,
+  ComparisonOperator,
+  Condition,
+  LogicalOperator,
+} from "./types";
 import { motion } from "framer-motion";
 import { processImage } from "./utils/imageProcessing";
 import { processNode } from "./utils/functions";
 
 const nodeTypes = {
-  block: BlockNode,
+  block: BlockNode as React.ComponentType<any>,
 };
 
 const mathOperations = [
@@ -50,6 +57,7 @@ const mathOperations = [
   "parlaklik",
   "kontrast",
   "bulanik",
+  "kenar",
   "değişken",
 ] as const;
 
@@ -258,45 +266,198 @@ export default function FlowEditor() {
     setOutput([]);
   }, []);
 
-  const handleRun = useCallback(() => {
-    console.log("Starting run operation");
-    // Clear previous output and processed nodes
+  function evaluateCondition(
+    condition: Condition,
+    nodes: Node[],
+    edges: Edge[]
+  ): boolean {
+    const leftNode = nodes.find((n) => n.id === condition.leftNodeId);
+    const rightNode = nodes.find((n) => n.id === condition.rightNodeId);
+
+    const leftValue = leftNode?.data?.result;
+    const rightValue = rightNode?.data?.result;
+
+    if (leftValue === undefined || rightValue === undefined) {
+      return false;
+    }
+
+    switch (condition.operator) {
+      case "<":
+        return leftValue < rightValue;
+      case ">":
+        return leftValue > rightValue;
+      case "<=":
+        return leftValue <= rightValue;
+      case ">=":
+        return leftValue >= rightValue;
+      case "==":
+        return leftValue === rightValue;
+      case "!=":
+        return leftValue !== rightValue;
+      default:
+        return false;
+    }
+  }
+
+  const evaluateConditionGroup = (
+    conditions: Condition[],
+    operators: LogicalOperator[],
+    inputValue: number
+  ): boolean => {
+    if (conditions.length === 0) return false;
+    if (conditions.length === 1) {
+      return evaluateCondition(conditions[0], nodes, edges);
+    }
+
+    let result = evaluateCondition(conditions[0], nodes, edges);
+
+    for (let i = 1; i < conditions.length; i++) {
+      const currentCondition = evaluateCondition(conditions[i], nodes, edges);
+      const operator = operators[i - 1];
+
+      if (operator === "AND") {
+        result = result && currentCondition;
+      } else {
+        result = result || currentCondition;
+      }
+    }
+
+    return result;
+  };
+
+  const handleRun = () => {
+    console.log("=== Starting Run Operation ===");
+    console.log("Current nodes:", nodes);
+    console.log("Current edges:", edges);
+
+    // Clear previous output
     setOutput([]);
-    processedNodes.clear();
 
-    // Reset all processed flags
-    setNodes((nds) =>
-      nds.map((node) => ({
-        ...node,
-        data: { ...node.data, processed: false },
-      }))
-    );
+    // Process variable nodes first
+    const variableNodes = nodes.filter((node) => node.data.type === "değişken");
+    console.log("Variable nodes:", variableNodes);
 
-    // Find the start nodes (nodes with no incoming edges)
-    const startNodes = nodes.filter(
-      (node) => !edges.some((edge) => edge.target === node.id)
-    );
+    // Process if blocks
+    const ifNodes = nodes.filter((node) => node.data.type === "if");
+    console.log("If nodes:", ifNodes);
 
-    console.log("Found start nodes:", startNodes.length);
-
-    // Process each start node
-    startNodes.forEach((startNode) => {
-      console.log("Processing node:", startNode.id, startNode.data.type);
-      const { result, output: nodeOutput } = processNode(
-        startNode as CustomNode,
-        nodes as CustomNode[],
-        edges,
-        processedNodes
+    for (const node of ifNodes) {
+      console.log("Processing if node:", node.id);
+      const conditionEdge = edges.find(
+        (edge) => edge.target === node.id && edge.targetHandle === "condition"
       );
 
-      if (result !== null) {
-        console.log("Updating node result:", startNode.id, result);
-        updateNode(startNode.id, { result });
-      }
+      if (conditionEdge) {
+        const inputNode = nodes.find((n) => n.id === conditionEdge.source);
+        if (inputNode?.data.result !== undefined) {
+          const conditionGroup = node.data.conditionGroup || {
+            conditions: [],
+            operators: [],
+          };
 
-      setOutput((prev) => [...prev, ...nodeOutput]);
-    });
-  }, [nodes, edges, updateNode, processedNodes, setNodes]);
+          const result = evaluateConditionGroup(
+            conditionGroup.conditions,
+            conditionGroup.operators,
+            inputNode.data.result
+          );
+
+          console.log("Condition result:", result);
+          updateNode(node.id, { result: result ? 1 : 0 });
+        }
+      }
+    }
+
+    // Process image nodes
+    const imageNodes = nodes.filter((node) =>
+      ["resimoku", "gri", "parlaklik", "kontrast", "bulanik", "kenar"].includes(
+        node.data.type || ""
+      )
+    );
+    console.log("Image processing nodes found:", imageNodes.length);
+
+    for (const node of imageNodes) {
+      console.log("Processing image node:", node.id, "(", node.data.type, ")");
+      const inputEdges = edges.filter((edge) => edge.target === node.id);
+      console.log("Input edges for image node:", inputEdges);
+
+      if (inputEdges.length > 0) {
+        const inputEdge = inputEdges[0];
+        const inputNode = nodes.find((n) => n.id === inputEdge.source);
+        console.log("Input node:", inputNode?.id, inputNode?.data.type);
+
+        if (inputNode?.data.imageData) {
+          console.log("Found input image data:", inputNode.data.imageData);
+
+          let intensity = 0;
+          if (
+            ["parlaklik", "kontrast", "bulanik"].includes(node.data.type || "")
+          ) {
+            const intensityEdge = edges.find(
+              (edge) =>
+                edge.target === node.id && edge.targetHandle === "intensity"
+            );
+            if (intensityEdge) {
+              const intensityNode = nodes.find(
+                (n) => n.id === intensityEdge.source
+              );
+              intensity = Number(intensityNode?.data.value) || 0;
+            }
+          }
+
+          console.log("Processing with intensity:", intensity);
+
+          const processed = processImage(
+            Array.from(inputNode.data.imageData.data),
+            inputNode.data.imageData.width,
+            inputNode.data.imageData.height,
+            node.data.type || "",
+            intensity,
+            node.data.algorithm || "sobel"
+          );
+
+          if (processed) {
+            console.log("Image processed successfully, updating node");
+            updateNode(node.id, {
+              imageData: {
+                width: processed.width,
+                height: processed.height,
+                data: new Uint8ClampedArray(processed.data),
+              },
+              originalImage: processed.originalImage || "",
+            });
+          }
+        }
+      }
+    }
+
+    // Process math operation nodes
+    const mathNodes = nodes.filter((node) =>
+      mathOperations.includes(node.data.type || "")
+    );
+    console.log("Math operation nodes:", mathNodes);
+
+    for (const node of mathNodes) {
+      console.log("Processing math node:", node.id, "(", node.data.type, ")");
+      const inputEdges = edges.filter((edge) => edge.target === node.id);
+      const inputValues = inputEdges.map((edge) => {
+        const inputNode = nodes.find((n) => n.id === edge.source);
+        return inputNode?.data.result;
+      });
+
+      const result = calculateMathOperation(
+        node.data.type || "",
+        inputValues[0],
+        inputValues[1]
+      );
+      console.log("Result for", node.data.type, ":", result);
+
+      if (result !== null) {
+        updateNode(node.id, { result });
+      }
+    }
+
+    console.log("=== Run Operation Complete ===");
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">

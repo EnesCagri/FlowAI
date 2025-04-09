@@ -2,10 +2,43 @@ import { memo, useState, useEffect, useRef } from "react";
 import { Handle, Position, NodeProps, useNodes, useEdges } from "@xyflow/react";
 import { useStore } from "../store/useFlowStore";
 import { motion } from "framer-motion";
-import { X, Upload, Image as ImageIcon } from "lucide-react";
-import { NodeData, MathOperation, mathOperations, EdgeData } from "../types";
+import { X, Plus, Upload, Image as ImageIcon } from "lucide-react";
+import {
+  NodeData,
+  MathOperation,
+  EdgeData,
+  CustomNode,
+  CustomEdge,
+  EdgeDetectionAlgorithm,
+  ComparisonOperator,
+  LogicalOperator,
+  Condition,
+} from "../types";
 import { processImage } from "../utils/imageProcessing";
+import { calculateMathOperation } from "../utils/functions";
 import Image from "next/image";
+
+const mathOperations = [
+  "topla",
+  "çıkar",
+  "çarp",
+  "böl",
+  "kare",
+  "karekök",
+  "mutlak",
+  "üs",
+  "mod",
+  "faktöriyel",
+  "yazdır",
+  "dosyaoku",
+  "resimoku",
+  "gri",
+  "parlaklik",
+  "kontrast",
+  "bulanik",
+  "kenar",
+  "if",
+] as const;
 
 const getNodeColor = (type: string) => {
   switch (type) {
@@ -41,10 +74,71 @@ const getNodeColor = (type: string) => {
     case "kontrast":
     case "bulanik":
       return "bg-purple-100 border-purple-300 hover:border-purple-400";
+    case "if":
+      return "bg-yellow-100 border-yellow-300 hover:border-yellow-400";
     default:
       return "bg-gray-100 border-gray-300 hover:border-gray-400";
   }
 };
+
+const isMathOperation = (type: MathOperation | undefined): boolean => {
+  return (
+    type !== undefined &&
+    type !== "değişken" &&
+    mathOperations.includes(type as any)
+  );
+};
+
+const isVariable = (type: MathOperation | undefined): boolean => {
+  return type === "değişken";
+};
+
+const ConditionEditor = ({
+  condition,
+  onUpdate,
+  onDelete,
+}: {
+  condition: Condition;
+  onUpdate: (id: string, updates: Partial<Condition>) => void;
+  onDelete: (id: string) => void;
+}) => (
+  <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-md">
+    <Handle
+      type="target"
+      position={Position.Left}
+      id={`left-${condition.id}`}
+      className="w-3 h-3 !bg-yellow-400 hover:!bg-yellow-500 transition-colors"
+    />
+    <select
+      value={condition.operator}
+      onChange={(e) =>
+        onUpdate(condition.id, {
+          operator: e.target.value as ComparisonOperator,
+        })
+      }
+      className="p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-yellow-400"
+    >
+      <option value="==">Eşittir (==)</option>
+      <option value="!=">Eşit Değildir (!=)</option>
+      <option value=">">Büyüktür (&gt;)</option>
+      <option value="<">Küçüktür (&lt;)</option>
+      <option value=">=">Büyük Eşittir (&gt;=)</option>
+      <option value="<=">Küçük Eşittir (&lt;=)</option>
+    </select>
+    <Handle
+      type="target"
+      position={Position.Right}
+      id={`right-${condition.id}`}
+      className="w-3 h-3 !bg-yellow-400 hover:!bg-yellow-500 transition-colors"
+    />
+    <button
+      onClick={() => onDelete(condition.id)}
+      className="p-1 text-red-500 hover:text-red-600 focus:outline-none"
+    >
+      <X size={16} />
+    </button>
+  </div>
+);
 
 export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
   const typedData = data as NodeData;
@@ -55,18 +149,39 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { updateNode, removeNode } = useStore();
-  const nodes = useNodes<NodeData>();
-  const edges = useEdges<EdgeData>();
+  const nodes = useNodes<CustomNode>();
+  const edges = useEdges<CustomEdge>();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [algorithm, setAlgorithm] = useState<EdgeDetectionAlgorithm>(
+    typedData.algorithm || "sobel"
+  );
+  const [operator, setOperator] = useState<ComparisonOperator>(
+    (typedData.condition?.operator as ComparisonOperator) || "=="
+  );
+
+  const isMathNode = isMathOperation(typedData.type);
+  const isSingleInputOperation = [
+    "kare",
+    "karekök",
+    "mutlak",
+    "faktöriyel",
+    "yazdır",
+    "dosyaoku",
+    "gri",
+  ].includes(typedData.type || "");
 
   useEffect(() => {
     if (typedData.type === "yazdır") {
-      const inputEdge = edges.find((edge) => edge.target === id);
-      if (inputEdge) {
-        const inputNode = nodes.find((n) => n.id === inputEdge.source);
+      // Find text input edge
+      const textInputEdge = edges.find(
+        (edge) => edge.target === id && edge.targetHandle === "text"
+      );
+      if (textInputEdge) {
+        const inputNode = nodes.find((n) => n.id === textInputEdge.source);
         if (inputNode) {
-          let newValue: string | undefined;
           const inputNodeData = inputNode.data as NodeData;
+          let newValue: string | undefined;
+
           if (inputNodeData.type === "dosyaoku") {
             newValue = inputNodeData.fileContent || "";
           } else {
@@ -78,7 +193,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
           if (newValue !== inputValue) {
             setInputValue(newValue);
             if (newValue !== undefined) {
-              console.log("Yazdır Node Output:", newValue);
+              console.log("Yazdır Node Text Input:", newValue);
             }
           }
         }
@@ -87,44 +202,6 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
       }
     }
   }, [typedData.type, edges, id, nodes, inputValue]);
-
-  /*
-  const processImageEffect = () => {
-    if (!typedData.type) return;
-
-    const inputEdges = edges.filter((edge) => edge.target === id);
-    if (inputEdges.length === 0) return;
-
-    const inputNode = nodes.find((node) => node.id === inputEdges[0].source);
-    if (!inputNode?.data) return;
-    const inputNodeData = inputNode.data as NodeData;
-    if (!inputNodeData.imageData) return;
-
-    const inputData = inputNodeData.imageData;
-    const intensity = typedData.value || 0;
-
-    const processed = processImage(
-      Array.from(inputData.data),
-      inputData.width,
-      inputData.height,
-      typedData.type,
-      intensity
-    );
-
-    if (processed) {
-      updateNode(id, {
-        ...typedData,
-        imageData: {
-          width: processed.width,
-          height: processed.height,
-          data: processed.data,
-        },
-        originalImage: processed.originalImage,
-        processed: true,
-      });
-    }
-  };
-  */
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
@@ -178,10 +255,12 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
   };
 
   const readImage = (file: File) => {
+    console.log("Reading image file:", file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new window.Image();
       img.onload = () => {
+        console.log("Image loaded, dimensions:", img.width, "x", img.height);
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
@@ -189,15 +268,18 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
         if (ctx) {
           ctx.drawImage(img, 0, 0);
           const imageData = ctx.getImageData(0, 0, img.width, img.height);
+          console.log("Image data created:", imageData.data.length, "bytes");
+          const originalImage = e.target?.result as string;
+          console.log("Setting image data in node:", id);
           updateNode(id, {
             imageData: {
               width: img.width,
               height: img.height,
               data: Array.from(imageData.data),
-              originalImage: e.target?.result as string,
             },
+            originalImage,
           });
-          setImagePreview(e.target?.result as string);
+          setImagePreview(originalImage);
         }
       };
       img.src = e.target?.result as string;
@@ -205,19 +287,127 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
     reader.readAsDataURL(file);
   };
 
-  const isMathOperation = mathOperations.includes(
-    typedData.type as MathOperation
-  );
-  const isSingleInputOperation = [
-    "kare",
-    "karekök",
-    "mutlak",
-    "faktöriyel",
-    "yazdır",
-    "dosyaoku",
-    "gri",
-  ].includes(typedData.type as MathOperation);
   const nodeColorClass = getNodeColor(typedData.type || "");
+
+  const addCondition = () => {
+    const newCondition: Condition = {
+      id: Math.random().toString(36).substr(2, 9),
+      operator: "==",
+      rightValue: 0,
+    };
+
+    const currentGroup = typedData.conditionGroup || {
+      conditions: [],
+      operators: [],
+    };
+
+    updateNode(id, {
+      conditionGroup: {
+        conditions: [...currentGroup.conditions, newCondition],
+        operators:
+          currentGroup.conditions.length > 0
+            ? [...currentGroup.operators, "AND"]
+            : [],
+      },
+    });
+  };
+
+  const updateCondition = (
+    conditionId: string,
+    updates: Partial<Condition>
+  ) => {
+    if (!typedData.conditionGroup) return;
+
+    const updatedConditions = typedData.conditionGroup.conditions.map((c) =>
+      c.id === conditionId ? { ...c, ...updates } : c
+    );
+
+    updateNode(id, {
+      conditionGroup: {
+        ...typedData.conditionGroup,
+        conditions: updatedConditions,
+      },
+    });
+  };
+
+  const deleteCondition = (conditionId: string) => {
+    if (!typedData.conditionGroup) return;
+
+    const index = typedData.conditionGroup.conditions.findIndex(
+      (c) => c.id === conditionId
+    );
+    if (index === -1) return;
+
+    const updatedConditions = typedData.conditionGroup.conditions.filter(
+      (c) => c.id !== conditionId
+    );
+    const updatedOperators = typedData.conditionGroup.operators.filter(
+      (_, i) => i !== (index === 0 ? 0 : index - 1)
+    );
+
+    updateNode(id, {
+      conditionGroup: {
+        conditions: updatedConditions,
+        operators: updatedOperators,
+      },
+    });
+  };
+
+  const toggleOperator = (index: number) => {
+    if (!typedData.conditionGroup) return;
+
+    const updatedOperators = [...typedData.conditionGroup.operators];
+    updatedOperators[index] = updatedOperators[index] === "AND" ? "OR" : "AND";
+
+    updateNode(id, {
+      conditionGroup: {
+        ...typedData.conditionGroup,
+        operators: updatedOperators,
+      },
+    });
+  };
+
+  const renderConditionEditor = () => {
+    if (typedData.type !== "if") return null;
+
+    const conditionGroup = typedData.conditionGroup || {
+      conditions: [],
+      operators: [],
+    };
+
+    return (
+      <div className="mt-2 p-2 bg-white/80 rounded-md">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-gray-700">Koşullar</p>
+          <button
+            onClick={addCondition}
+            className="p-1 text-yellow-600 hover:text-yellow-700 focus:outline-none"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {conditionGroup.conditions.map((condition, index) => (
+            <div key={condition.id} className="relative">
+              <ConditionEditor
+                condition={condition}
+                onUpdate={updateCondition}
+                onDelete={deleteCondition}
+              />
+              {index < conditionGroup.conditions.length - 1 && (
+                <button
+                  onClick={() => toggleOperator(index)}
+                  className="mt-1 mb-1 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 focus:outline-none"
+                >
+                  {conditionGroup.operators[index]}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <motion.div
@@ -241,7 +431,103 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
       <div className="flex flex-col">
         <div className="text-lg font-bold text-gray-800">{typedData.label}</div>
         <div className="text-gray-500 text-sm">{typedData.type}</div>
-        {typedData.type === "değişken" && (
+
+        {/* Edge Detection Algorithm Selector */}
+        {typedData.type === "kenar" && (
+          <div className="mt-2">
+            <select
+              value={algorithm}
+              onChange={(e) => {
+                setAlgorithm(e.target.value as EdgeDetectionAlgorithm);
+                updateNode(id, {
+                  algorithm: e.target.value as EdgeDetectionAlgorithm,
+                });
+              }}
+              className="w-full p-2 text-sm bg-white/80 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+              <option value="sobel">Sobel</option>
+              <option value="prewitt">Prewitt</option>
+              <option value="roberts">Roberts</option>
+            </select>
+          </div>
+        )}
+
+        {/* Display math operation results */}
+        {isMathNode && typedData.result !== undefined && (
+          <div className="mt-2 text-sm font-medium text-gray-700 bg-white/80 p-2 rounded-md">
+            Sonuç: {typedData.result}
+          </div>
+        )}
+
+        {/* Display image preview for image nodes */}
+        {(typedData.type === "resimoku" ||
+          ["gri", "parlaklik", "kontrast", "bulanik", "kenar"].includes(
+            typedData.type || ""
+          )) && (
+          <div className="mt-2">
+            {typedData.imageData && typedData.originalImage ? (
+              <div className="flex flex-col gap-2">
+                <div>
+                  {typedData.imageData.data && (
+                    <canvas
+                      ref={(canvas) => {
+                        if (canvas && typedData.imageData) {
+                          const ctx = canvas.getContext("2d");
+                          if (ctx) {
+                            canvas.width = typedData.imageData.width;
+                            canvas.height = typedData.imageData.height;
+                            const imageData = new ImageData(
+                              new Uint8ClampedArray(typedData.imageData.data),
+                              typedData.imageData.width,
+                              typedData.imageData.height
+                            );
+                            ctx.putImageData(imageData, 0, 0);
+                          }
+                        }
+                      }}
+                      width={typedData.imageData.width}
+                      height={typedData.imageData.height}
+                      className="max-w-full h-auto rounded-md"
+                      style={{ maxHeight: "200px" }}
+                    />
+                  )}
+                </div>
+              </div>
+            ) : typedData.type === "resimoku" ? (
+              <div
+                className={`mt-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
+                  isDragging
+                    ? "border-purple-400 bg-purple-50"
+                    : "border-gray-300"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleImageDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                />
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <ImageIcon size={24} className="text-gray-400" />
+                  <p className="text-sm text-gray-500 text-center">
+                    Resmi sürükleyin veya tıklayarak seçin
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Variable block value display */}
+        {isVariable(typedData.type) && (
           <div className="mt-2">
             {isEditing ? (
               <motion.div
@@ -313,90 +599,94 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             )}
           </div>
         )}
-        {typedData.type === "yazdır" && inputValue !== undefined && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-2 text-sm bg-white/80 p-2 rounded-md backdrop-blur-sm"
-          >
-            <span className="font-semibold">Giriş:</span> {inputValue}
-          </motion.div>
-        )}
-        {typedData.type === "resimoku" && (
-          <div
-            className={`mt-2 p-4 border-2 border-dashed rounded-lg transition-colors ${
-              isDragging ? "border-purple-400 bg-purple-50" : "border-gray-300"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleImageDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
+        {typedData.type === "yazdır" && (
+          <div className="mt-2 space-y-2">
             <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*"
-              onChange={handleImageSelect}
+              type="text"
+              value={typedData.value || ""}
+              onChange={(e) => updateNode(id, { value: e.target.value })}
+              placeholder="Yazdırılacak metin..."
+              className="w-full p-2 text-sm bg-white/80 border rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
-            <div className="flex flex-col items-center justify-center gap-2">
-              <ImageIcon size={24} className="text-gray-400" />
-              <p className="text-sm text-gray-500 text-center">
-                Resmi sürükleyin veya tıklayarak seçin
-              </p>
-            </div>
-            {imagePreview && (
+            {inputValue !== undefined && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mt-2"
+                className="text-sm bg-white/80 p-2 rounded-md backdrop-blur-sm"
               >
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  width={200}
-                  height={200}
-                  className="max-w-full h-auto rounded-md"
-                  style={{ maxHeight: "200px" }}
-                />
+                <span className="font-semibold">Giriş:</span> {inputValue}
               </motion.div>
             )}
           </div>
         )}
-        {["gri", "parlaklik", "kontrast", "bulanik"].includes(
-          typedData.type || ""
-        ) &&
-          imagePreview && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-2"
-            >
-              <Image
-                src={imagePreview}
-                alt="Processed Preview"
-                width={200}
-                height={200}
-                className="max-w-full h-auto rounded-md"
-                style={{ maxHeight: "200px" }}
-              />
-            </motion.div>
-          )}
+
+        {/* Add condition editor for if blocks */}
+        {renderConditionEditor()}
       </div>
 
-      {typedData.type === "dosyaoku" || typedData.type === "resimoku" ? (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
-        />
-      ) : ["parlaklik", "kontrast", "bulanik"].includes(
-          typedData.type || ""
-        ) ? (
+      {/* Add handles for blocks */}
+      {typedData.type === "if" ? (
         <>
+          {/* True branch output */}
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="true"
+            className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
+            style={{ left: "30%" }}
+          />
+          {/* False branch output */}
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="false"
+            className="w-3 h-3 !bg-red-400 hover:!bg-red-500 transition-colors"
+            style={{ left: "70%" }}
+          />
+        </>
+      ) : typedData.type === "yazdır" ? (
+        <>
+          {/* Flow control input socket */}
+          <Handle
+            type="target"
+            position={Position.Top}
+            id="flow"
+            className="w-3 h-3 !bg-purple-400 hover:!bg-purple-500 transition-colors"
+            style={{ left: "30%" }}
+          />
+          {/* Text input socket */}
+          <Handle
+            type="target"
+            position={Position.Top}
+            id="text"
+            className="w-3 h-3 !bg-blue-400 hover:!bg-blue-500 transition-colors"
+            style={{ left: "70%" }}
+          />
+          {/* Output socket */}
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
+          />
+        </>
+      ) : typedData.type === "kenar" ? (
+        <>
+          <Handle
+            type="target"
+            position={Position.Top}
+            className="w-3 h-3 !bg-blue-400 hover:!bg-blue-500 transition-colors"
+          />
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
+          />
+        </>
+      ) : typedData.type === "parlaklik" ||
+        typedData.type === "kontrast" ||
+        typedData.type === "bulanik" ? (
+        <>
+          {/* Image input handle */}
           <Handle
             type="target"
             position={Position.Top}
@@ -404,6 +694,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             className="w-3 h-3 !bg-blue-400 hover:!bg-blue-500 transition-colors"
             style={{ left: "30%" }}
           />
+          {/* Intensity input handle */}
           <Handle
             type="target"
             position={Position.Top}
@@ -430,7 +721,7 @@ export const BlockNode = ({ id, data }: NodeProps<NodeData>) => {
             className="w-3 h-3 !bg-green-400 hover:!bg-green-500 transition-colors"
           />
         </>
-      ) : isMathOperation ? (
+      ) : isMathNode ? (
         <>
           <Handle
             type="target"

@@ -7,7 +7,10 @@ export const calculateMathOperation = (
   nodes: CustomNode[],
   edges: Edge[]
 ) => {
+  console.log("Calculating math operation for node:", node.id, node.data.type);
   const inputEdges = edges.filter((edge) => edge.target === node.id);
+  console.log("Input edges:", inputEdges);
+
   const isSingleInputOperation = [
     "kare",
     "karekök",
@@ -18,67 +21,112 @@ export const calculateMathOperation = (
 
   if (isSingleInputOperation) {
     const input1 = inputEdges[0];
-    if (!input1) return null;
+    if (!input1) {
+      console.log("No input edge found for single input operation");
+      return null;
+    }
 
     const inputNode1 = nodes.find((n) => n.id === input1.source);
-    if (!inputNode1) return null;
+    if (!inputNode1) {
+      console.log("Input node not found");
+      return null;
+    }
 
     const value1 = inputNode1.data.value || inputNode1.data.result;
-    if (value1 === undefined) return null;
+    console.log("Input value:", value1);
+    if (value1 === undefined) {
+      console.log("Input value is undefined");
+      return null;
+    }
 
+    let result;
     switch (node.data.type) {
       case "kare":
-        return Math.pow(Number(value1), 2);
+        result = Math.pow(Number(value1), 2);
+        break;
       case "karekök":
-        return Math.sqrt(Number(value1));
+        result = Math.sqrt(Number(value1));
+        break;
       case "mutlak":
-        return Math.abs(Number(value1));
+        result = Math.abs(Number(value1));
+        break;
       case "faktöriyel":
-        let result = 1;
+        result = 1;
         for (let i = 2; i <= Number(value1); i++) {
           result *= i;
         }
-        return result;
+        break;
       case "yazdır":
-        return value1;
+        result = value1;
+        break;
       default:
-        return null;
+        result = null;
     }
+    console.log("Calculated result for single input:", result);
+    return result;
   } else {
-    if (inputEdges.length !== 2) return null;
+    if (inputEdges.length !== 2) {
+      console.log("Expected 2 input edges, got:", inputEdges.length);
+      return null;
+    }
 
     const input1 = inputEdges.find((edge) => edge.targetHandle === "input1");
     const input2 = inputEdges.find((edge) => edge.targetHandle === "input2");
 
-    if (!input1 || !input2) return null;
+    if (!input1 || !input2) {
+      console.log("Missing input edges:", { input1, input2 });
+      return null;
+    }
 
     const inputNode1 = nodes.find((n) => n.id === input1.source);
     const inputNode2 = nodes.find((n) => n.id === input2.source);
 
-    if (!inputNode1 || !inputNode2) return null;
+    if (!inputNode1 || !inputNode2) {
+      console.log("Input nodes not found:", { inputNode1, inputNode2 });
+      return null;
+    }
 
     const value1 = inputNode1.data.value || inputNode1.data.result;
     const value2 = inputNode2.data.value || inputNode2.data.result;
+    console.log("Input values:", { value1, value2 });
 
-    if (value1 === undefined || value2 === undefined) return null;
+    if (value1 === undefined || value2 === undefined) {
+      console.log("Input values undefined");
+      return null;
+    }
 
+    let result;
     switch (node.data.type) {
       case "topla":
-        return Number(value1) + Number(value2);
+        result = Number(value1) + Number(value2);
+        console.log(result);
+        break;
       case "çıkar":
-        return Number(value1) - Number(value2);
+        result = Number(value1) - Number(value2);
+        console.log(result);
+        break;
       case "çarp":
-        return Number(value1) * Number(value2);
+        result = Number(value1) * Number(value2);
+        console.log(result);
+        break;
       case "böl":
-        if (Number(value2) === 0) return null;
-        return Number(value1) / Number(value2);
+        if (Number(value2) === 0) {
+          console.log("Division by zero!");
+          return null;
+        }
+        result = Number(value1) / Number(value2);
+        break;
       case "üs":
-        return Math.pow(Number(value1), Number(value2));
+        result = Math.pow(Number(value1), Number(value2));
+        break;
       case "mod":
-        return Number(value1) % Number(value2);
+        result = Number(value1) % Number(value2);
+        break;
       default:
-        return null;
+        result = null;
     }
+    console.log("Calculated result for double input:", result);
+    return result;
   }
 };
 
@@ -88,19 +136,22 @@ export const processNode = (
   edges: Edge[],
   processedNodes: Set<string>
 ): { result: any; output: string[] } => {
-  // If the node has already been processed and has a result, return it
+  console.log("Processing node:", { id: node.id, type: node.data.type });
+
   if (
     node.data.processed &&
     (node.data.result !== undefined || node.data.imageData)
   ) {
-    console.log("Node already processed:", node.id, node.data.type);
+    console.log("Node already processed:", {
+      id: node.id,
+      result: node.data.result,
+    });
     return {
       result: node.data.result || node.data.imageData,
       output: [node.data.output || ""],
     };
   }
 
-  console.log("Processing node:", node.id, node.data.type);
   processedNodes.add(node.id);
   let result = null;
   let output: string[] = [];
@@ -108,6 +159,7 @@ export const processNode = (
   switch (node.data.type) {
     case "değişken":
       result = node.data.value;
+      console.log("Variable node value:", result);
       output.push(`Değer: ${result || "undefined"}`);
       break;
 
@@ -123,6 +175,7 @@ export const processNode = (
             processedNodes
           );
           result = inputResult;
+          console.log("Print node result:", result);
           output.push(
             `Çıktı: ${inputResult !== undefined ? inputResult : "undefined"}`
           );
@@ -196,6 +249,7 @@ export const processNode = (
         ].includes(node.data.type || "")
       ) {
         result = calculateMathOperation(node, nodes, edges);
+        console.log("Math operation result:", { type: node.data.type, result });
         if (result !== null) {
           output.push(`Sonuç: ${result}`);
         }
@@ -206,19 +260,10 @@ export const processNode = (
   // Mark the node as processed and store the result
   node.data.processed = true;
   if (result !== null) {
-    if (
-      ["gri", "parlaklik", "kontrast", "bulanik"].includes(node.data.type || "")
-    ) {
-      node.data.imageData = result;
-      node.data.result = undefined; // Clear any previous numeric result
-    } else {
-      node.data.result = result;
-      node.data.imageData = undefined; // Clear any previous image data
-    }
+    node.data.result = result;
+    console.log("Updated node data:", { id: node.id, result });
   }
 
-  // Store the output in the node's data for display in the block
   node.data.output = output.join("\n");
-
   return { result, output };
 };
